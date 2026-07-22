@@ -1,3 +1,5 @@
+const APP_VERSION = '20260722-location-fix';
+
 const people = {
   anu: { label: 'Anu', color: '#ff4f8b' },
   varun: { label: 'Varun', color: '#7c4dff' },
