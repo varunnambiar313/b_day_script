@@ -21,7 +21,7 @@ This is a small PHP app. From the repository root, run:
 php -S localhost:8000
 ```
 
-Open `http://localhost:8000` in your browser. Do not open `index.html` directly from the filesystem; the check-in API must be served by PHP. The browser first calls `checkin.php` and then `src/checkin.php`; if both return HTML instead of JSON, the app falls back to browser-only demo storage and shows a setup message. Browser location APIs require a secure context; `localhost` is allowed for local development. In production, serve it over HTTPS.
+Open `http://localhost:8000` in your browser. Browser location APIs require a secure context; `localhost` is allowed for local development. In production, serve it over HTTPS.
 
 ## Replacing the images
 

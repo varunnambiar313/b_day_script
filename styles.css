@@ -85,25 +85,3 @@ h1 span { display: inline-block; animation: pulse 1.6s infinite; }
   color: var(--marker);
 }
 .love-marker span { font-size: .78rem; }
-#map::before {
-  content: "Loading your love map…";
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg, #fff7fb, #ffe2ec);
-  color: var(--heart);
-  font-weight: 800;
-  z-index: 500;
-  transition: opacity .25s ease;
-}
-#map.map-ready::before,
-#map.map-error::before {
-  opacity: 0;
-  pointer-events: none;
-}
-#map.map-error {
-  display: grid;
-  place-items: center;
-  background: #fff7fb;
-}
