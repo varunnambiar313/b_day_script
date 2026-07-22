@@ -1,19 +1,28 @@
-const APP_VERSION = '20260722-location-fix';
+const APP_VERSION = '20260722-github-checkins';
 
 const people = {
   anu: { label: 'Anu', color: '#ff4f8b' },
   varun: { label: 'Varun', color: '#7c4dff' },
 };
 
+const githubStorage = {
+  owner: window.CHECKIN_GITHUB_OWNER || inferGithubOwner(),
+  repo: window.CHECKIN_GITHUB_REPO || inferGithubRepo(),
+  branch: window.CHECKIN_GITHUB_BRANCH || 'main',
+  path: window.CHECKIN_GITHUB_PATH || 'data/checkins.json',
+  tokenStorageKey: 'love-map-github-token',
+};
+
+const emptyCheckins = { anu: null, varun: null };
 const statusEl = document.querySelector('#status');
 const distanceEl = document.querySelector('#distance');
 const loveNoteEl = document.querySelector('#love-note');
 const updatedEl = document.querySelector('#last-updated');
-const apiUrl = new URL('checkin.php', window.location.href);
 const initialCenter = [20, 0];
 const map = L.map('map', { worldCopyJump: true }).setView(initialCenter, 2);
 let markers = {};
 let connectionLine;
+let lastGithubFileSha;
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
@@ -21,6 +30,24 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 window.addEventListener('resize', () => map.invalidateSize());
+
+function inferGithubOwner() {
+  const match = window.location.hostname.match(/^([^.]+)\.github\.io$/i);
+  return match?.[1] || '';
+}
+
+function inferGithubRepo() {
+  const firstPathSegment = window.location.pathname.split('/').filter(Boolean)[0];
+  return firstPathSegment || window.location.hostname.split('.')[0] || '';
+}
+
+function githubApiUrl({ includeRef = false, bustCache = false } = {}) {
+  const encodedPath = githubStorage.path.split('/').map(encodeURIComponent).join('/');
+  const url = new URL(`https://api.github.com/repos/${githubStorage.owner}/${githubStorage.repo}/contents/${encodedPath}`);
+  if (includeRef) url.searchParams.set('ref', githubStorage.branch);
+  if (bustCache) url.searchParams.set('_', Date.now().toString());
+  return url;
+}
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -126,58 +153,103 @@ function renderMap(checkins = {}) {
   requestAnimationFrame(() => map.invalidateSize());
 }
 
-async function parseJsonResponse(response) {
-  const body = await response.text();
-  let data;
-
-  try {
-    data = body ? JSON.parse(body) : {};
-  } catch (error) {
-    const preview = body.trim().slice(0, 80) || 'empty response';
-    throw new Error(`The check-in service returned ${response.status} ${response.statusText || 'response'} instead of JSON. Preview: ${preview}`);
-  }
-
-  if (!response.ok) {
-    throw new Error(data.error || 'The check-in service could not complete the request.');
-  }
-
-  return data;
+function decodeBase64Json(content) {
+  const decoded = atob(content.replace(/\s/g, ''));
+  return JSON.parse(decodeURIComponent(escape(decoded)));
 }
 
-async function requestJson(path, options = {}) {
-  const response = await fetch(path, {
+function encodeBase64Json(data) {
+  const json = JSON.stringify(data, null, 2) + '\n';
+  return btoa(unescape(encodeURIComponent(json)));
+}
+
+function normalizeStoredData(data = {}) {
+  return {
+    checkins: {
+      ...emptyCheckins,
+      ...(data.checkins || {}),
+    },
+  };
+}
+
+async function fetchGithubFile() {
+  if (!githubStorage.owner || !githubStorage.repo) {
+    throw new Error('GitHub Pages repository could not be detected. Set CHECKIN_GITHUB_OWNER and CHECKIN_GITHUB_REPO before app.js loads.');
+  }
+
+  const response = await fetch(githubApiUrl({ includeRef: true, bustCache: true }), {
     cache: 'no-store',
-    credentials: 'same-origin',
-    ...options,
     headers: {
-      Accept: 'application/json',
-      ...(options.headers || {}),
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
     },
   });
 
-  return parseJsonResponse(response);
+  if (response.status === 404) {
+    lastGithubFileSha = undefined;
+    return normalizeStoredData();
+  }
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || 'Could not load check-ins from GitHub.');
+
+  lastGithubFileSha = data.sha;
+  return normalizeStoredData(decodeBase64Json(data.content || 'e30='));
 }
 
 async function loadCheckins() {
-  const data = await requestJson(apiUrl);
-  renderMap(data.checkins || {});
+  const data = await fetchGithubFile();
+  renderMap(data.checkins);
+  return data;
+}
+
+function githubToken() {
+  const stored = localStorage.getItem(githubStorage.tokenStorageKey);
+  if (stored) return stored;
+
+  const token = window.prompt('Paste a fine-grained GitHub token with Contents: Read and write access for this repository. It is stored only in this browser so GitHub Pages can update data/checkins.json.');
+  if (!token) throw new Error('GitHub token is required to save a check-in from GitHub Pages.');
+  localStorage.setItem(githubStorage.tokenStorageKey, token.trim());
+  return token.trim();
 }
 
 async function saveCheckin(person, position) {
-  const payload = {
-    person,
+  const latest = await fetchGithubFile();
+  const nextData = normalizeStoredData(latest);
+  nextData.checkins[person] = {
     latitude: position.coords.latitude,
     longitude: position.coords.longitude,
     accuracy: position.coords.accuracy,
+    checked_in_at: new Date().toISOString(),
   };
 
-  const data = await requestJson(apiUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  const body = {
+    message: `Update ${people[person].label} check-in`,
+    content: encodeBase64Json(nextData),
+    branch: githubStorage.branch,
+  };
+  if (lastGithubFileSha) body.sha = lastGithubFileSha;
 
-  return data;
+  const response = await fetch(githubApiUrl(), {
+    method: 'PUT',
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${githubToken()}`,
+      'Content-Type': 'application/json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    },
+    body: JSON.stringify(body),
+  });
+  const saved = await response.json();
+
+  if (response.status === 401 || response.status === 403) {
+    localStorage.removeItem(githubStorage.tokenStorageKey);
+    throw new Error('GitHub rejected the saved token. Create a fine-grained token with Contents read/write access and try again.');
+  }
+  if (!response.ok) throw new Error(saved.message || 'GitHub could not save the check-in.');
+
+  lastGithubFileSha = saved.content?.sha;
+  return nextData;
 }
 
 function getDeviceLocation() {
@@ -217,8 +289,11 @@ async function checkIn(person) {
 
   try {
     const position = await getDeviceLocation();
-    const data = await saveCheckin(person, position);
-    renderMap(data.checkins || {});
+    setStatus(`Saving ${people[person].label}'s check-in to GitHub...`);
+    await saveCheckin(person, position);
+    setStatus('Check-in saved. Refreshing the love map from GitHub...');
+    const refreshed = await loadCheckins();
+    renderMap(refreshed.checkins || {});
     setStatus(`${people[person].label} checked in. Sending a tiny heart across the map!`);
   } catch (error) {
     setStatus(locationErrorMessage(error), true);
@@ -229,4 +304,6 @@ document.querySelectorAll('.person-button').forEach((button) => {
   button.addEventListener('click', () => checkIn(button.dataset.person));
 });
 
-loadCheckins().catch((error) => setStatus(error.message || 'Ready when you are. First check-in will create the love map.', true));
+loadCheckins()
+  .then(() => setStatus('Tap your picture to share your latest location.'))
+  .catch((error) => setStatus(error.message || 'Ready when you are. First check-in will create the love map.', true));
