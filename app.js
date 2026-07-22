@@ -178,70 +178,21 @@ async function saveCheckin(person, position) {
   return data;
 }
 
-function getDeviceLocation(options) {
+function getDeviceLocation() {
   return new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(resolve, reject, options);
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 20000,
+      maximumAge: 0,
+    });
   });
-}
-
-async function getApproximateLocation() {
-  const response = await fetch('https://ipapi.co/json/', {
-    cache: 'no-store',
-    headers: { Accept: 'application/json' },
-  });
-
-  const data = await parseJsonResponse(response);
-  const latitude = Number(data.latitude);
-  const longitude = Number(data.longitude);
-
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    throw new Error('Approximate location lookup did not return usable coordinates.');
-  }
-
-  return {
-    coords: {
-      latitude,
-      longitude,
-      accuracy: 50000,
-    },
-    approximate: true,
-  };
-}
-
-async function getPermissionState() {
-  if (!navigator.permissions?.query) return 'unknown';
-
-  try {
-    const permission = await navigator.permissions.query({ name: 'geolocation' });
-    return permission.state;
-  } catch (error) {
-    return 'unknown';
-  }
-}
-
-async function getBestAvailableLocation(onFallback) {
-  try {
-    return await getDeviceLocation({ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
-  } catch (error) {
-    if (error?.code === 2 || error?.code === 3) {
-      try {
-        return await getDeviceLocation({ enableHighAccuracy: false, timeout: 30000, maximumAge: 300000 });
-      } catch (retryError) {
-        error = retryError;
-      }
-    }
-
-    const permissionState = await getPermissionState();
-    if (onFallback) onFallback(error, permissionState);
-    return getApproximateLocation();
-  }
 }
 
 function locationErrorMessage(error) {
-  if (error?.code === 1) return 'Precise GPS access is blocked for this browser. I can still try an approximate location from the device network.';
-  if (error?.code === 2) return 'This device could not determine precise GPS location, so I can try an approximate network location.';
-  if (error?.code === 3) return 'Precise GPS took too long, so I can try an approximate network location.';
-  return error?.message || 'This device could not share its precise location.';
+  if (error?.code === error?.PERMISSION_DENIED) return 'Location permission is needed to check in. On iPhone, enable Location Services and allow Safari/this app to access your location.';
+  if (error?.code === error?.POSITION_UNAVAILABLE) return 'This device could not determine its current location. Please check GPS, Wi-Fi, or cellular service and try again.';
+  if (error?.code === error?.TIMEOUT) return 'Finding this device took too long. Please try again from a place with a stronger signal.';
+  return error?.message || 'This device could not share its location.';
 }
 
 async function checkIn(person) {
@@ -250,27 +201,23 @@ async function checkIn(person) {
     return;
   }
 
+  if (!window.isSecureContext) {
+    setStatus('Location sharing needs HTTPS, or localhost while testing.', true);
+    return;
+  }
+
+  if (!navigator.geolocation) {
+    setStatus('This browser does not support location sharing.', true);
+    return;
+  }
+
   setStatus(`Finding ${people[person].label}'s spot on the love map...`);
 
   try {
-    let position;
-
-    if (!window.isSecureContext) {
-      setStatus('Precise GPS needs HTTPS or localhost. Trying an approximate network location now...', true);
-      position = await getApproximateLocation();
-    } else if (!navigator.geolocation) {
-      setStatus('This browser does not support precise GPS. Trying an approximate network location now...', true);
-      position = await getApproximateLocation();
-    } else {
-      position = await getBestAvailableLocation((error, permissionState) => {
-        const permissionNote = permissionState === 'denied' ? ' Permission is currently denied in the browser settings.' : '';
-        setStatus(`${locationErrorMessage(error)}${permissionNote} Trying an approximate location now...`, true);
-      });
-    }
+    const position = await getDeviceLocation();
     const data = await saveCheckin(person, position);
     renderMap(data.checkins || {});
-    const precision = position.approximate ? ' with an approximate network location' : '';
-    setStatus(`${people[person].label} checked in${precision}. Sending a tiny heart across the map!`);
+    setStatus(`${people[person].label} checked in. Sending a tiny heart across the map!`);
   } catch (error) {
     setStatus(locationErrorMessage(error), true);
   }
