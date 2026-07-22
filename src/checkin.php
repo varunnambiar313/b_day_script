@@ -1,5 +1,9 @@
 <?php
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
+header('Access-Control-Allow-Origin: ' . ($_SERVER['HTTP_ORIGIN'] ?? '*'));
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Accept');
 
 const DB_PATH = __DIR__ . '/../data/checkins.sqlite';
 const PEOPLE = ['anu', 'varun'];
@@ -53,6 +57,10 @@ function latestCheckins(PDO $pdo): array
 try {
     $pdo = db();
 
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        respond(['ok' => true]);
+    }
+
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         respond(['checkins' => latestCheckins($pdo)]);
     }
@@ -61,9 +69,10 @@ try {
         respond(['error' => 'Unsupported request method.'], 405);
     }
 
-    $input = json_decode(file_get_contents('php://input'), true);
+    $rawInput = file_get_contents('php://input') ?: '';
+    $input = json_decode($rawInput, true);
     if (!is_array($input)) {
-        respond(['error' => 'Invalid JSON body.'], 400);
+        respond(['error' => 'Invalid JSON body. Send Content-Type: application/json with person, latitude, and longitude.'], 400);
     }
 
     $person = strtolower((string) ($input['person'] ?? ''));
