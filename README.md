@@ -1,14 +1,32 @@
-# b_day_script
-birthday php script
+# Anu ❤️ Varun Distance Check-In
 
-A simple form with two scripts on the src:
- 
- The first one (datetime.php) inserts the specific date on the mysql database and the second one (selectdate.php)selects the date that 
- matches with the current day.
- 
- I have put a simple echo statement that just print how many dates are equal with today's date but you can add whatever you want( a function
- that sends email with notifications etc)
- 
- 
- 
- 
+A cute couple-themed web app for Anu and Varun to check in from wherever they are. Each check-in stores the person's latest browser location and timestamp, then shows both latest locations on a world map with a heart-colored line and the distance between them.
+
+## Features
+
+- Two large check-in buttons: **Check in as Anu** and **Check in as Varun**.
+- Browser geolocation capture for latitude, longitude, accuracy, and timestamp.
+- SQLite-backed latest-location database at `data/checkins.sqlite`.
+- Leaflet/OpenStreetMap world map centered on the midpoint between both latest check-ins.
+- A line connecting both people, distance in miles, and a rotating cute long-distance one-liner.
+- Image folders for personal photos:
+  - `assets/images/anu/profile.svg`
+  - `assets/images/varun/profile.svg`
+
+## Run locally
+
+This is a small PHP app. From the repository root, run:
+
+```bash
+php -S localhost:8000
+```
+
+Open `http://localhost:8000` in your browser. Browser location APIs require a secure context; `localhost` is allowed for local development. In production, serve it over HTTPS.
+
+## Replacing the images
+
+Replace the placeholder SVGs in `assets/images/anu/` and `assets/images/varun/` with your own photos. Keep the filenames as `profile.svg`, or update the `<img>` paths in `index.html` if you prefer different filenames or formats.
+
+## Notes
+
+Make sure the PHP process can write to the `data/` directory so SQLite can create and update `data/checkins.sqlite`.
