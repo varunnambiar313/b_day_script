@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Varun placeholder portrait">
+  <rect width="240" height="240" rx="120" fill="#e6dcff"/>
+  <circle cx="120" cy="96" r="52" fill="#2f2342"/>
+  <circle cx="120" cy="108" r="43" fill="#c98d72"/>
+  <path d="M54 216c14-45 43-68 66-68s52 23 66 68" fill="#7c4dff"/>
+  <path d="M88 108c17 15 47 15 64 0" fill="none" stroke="#2f2342" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="102" cy="93" r="5" fill="#2f2342"/><circle cx="138" cy="93" r="5" fill="#2f2342"/>
+  <text x="120" y="229" text-anchor="middle" font-family="Poppins, Arial" font-size="25" font-weight="700" fill="#fff">Varun</text>
+</svg>
