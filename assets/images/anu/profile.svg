@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="Anu placeholder portrait">
-  <rect width="240" height="240" rx="120" fill="#ffe1ec"/>
-  <circle cx="120" cy="98" r="54" fill="#7a3f2d"/>
-  <circle cx="120" cy="106" r="45" fill="#f3b79f"/>
-  <path d="M54 216c14-45 43-68 66-68s52 23 66 68" fill="#ff4f8b"/>
-  <path d="M88 105c17 17 47 17 64 0" fill="none" stroke="#55223d" stroke-width="7" stroke-linecap="round"/>
-  <circle cx="102" cy="91" r="5" fill="#55223d"/><circle cx="138" cy="91" r="5" fill="#55223d"/>
-  <text x="120" y="229" text-anchor="middle" font-family="Poppins, Arial" font-size="28" font-weight="700" fill="#fff">Anu</text>
-</svg>
